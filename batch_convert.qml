@@ -356,6 +356,23 @@ MuseScore {
           visible: !traverseSubdirs.checked 
           text: qsTr("Different Export\nPath")
           } // differentExportPath
+        CheckBox {
+          id: transpose
+          text: qsTr("Transpose")
+          } // transpose
+        SpinBox {
+          id: transposeAmount
+
+          minimumValue: -100
+          maximumValue: 100
+          value: 0
+          stepSize: 1
+
+          visible: transpose.checked
+          horizontalAlignment: Qt.AlignLeft
+          suffix: qsTr(" semitones")
+          prefix: qsTr("by ")
+          } // transposeAmount
         Button {
           id: reset
           text: /*qsTr("Reset to Defaults")*/ qsTranslate("QPlatformTheme", "Restore Defaults")
@@ -438,6 +455,8 @@ MuseScore {
     property alias exportE: exportExcerpts.checked
     property alias travers: traverseSubdirs.checked
     property alias diffEPath: differentExportPath.checked  // different export path
+    property alias transpose: transpose.checked
+    property alias transposeAmount: transposeAmount.value
     }
 
   FileDialog {
@@ -446,6 +465,7 @@ MuseScore {
       qsTr("Select Sources Startfolder") :
       qsTr("Select Sources Folder")
     selectFolder: true
+    folder: shortcuts.documents
     
     onAccepted: {
       if (differentExportPath.checked && !traverseSubdirs.checked)
@@ -464,7 +484,7 @@ MuseScore {
     title: qsTr("Select Target Folder")
     selectFolder: true
     
-    property string folderPath: ""
+    folder: shortcuts.documents
     onAccepted: {
       // remove the file:/// at the beginning of the return value of targetFolderDialog.folder
       // However, what needs to be done depends on the platform.
@@ -649,9 +669,9 @@ MuseScore {
       var targetBase;
       if (differentExportPath.checked && !traverseSubdirs.checked)
         targetBase = targetFolderDialog.folderPath + "/" + fileName 
-                                    + "-" + createDefaultFileName(partTitle) + "." 
+                                    + "-" + createDefaultFileName(partTitle) + (transpose.checked ? "-transposed"+ transposeAmount.value : "") + "." 
       else
-        targetBase = filePath + fileName + "-" + createDefaultFileName(partTitle) + "." 
+        targetBase = filePath + fileName + (transpose.checked ? "-transposed"+ transposeAmount.value : "") + "-" + createDefaultFileName(partTitle) + "." 
 
       // write for all target formats
       for (var j = 0; j < outFormats.extensions.length; j++) {
@@ -674,8 +694,7 @@ MuseScore {
       if (!abortRequested && excerptsList.length > 0)
         excerptTimer.running = true
       else {
-        // close base score
-        closeScore(curBaseScore)
+        closeScore(curBaseScore) // close base score
         processTimer.running = true
         }
       }
@@ -717,14 +736,30 @@ MuseScore {
         // write for all target formats
         for (var j = 0; j < outFormats.extensions.length; j++) {
           if (differentExportPath.checked && !traverseSubdirs.checked)
-            fileScore.source = targetFolderDialog.folderPath + "/" + fileName + "." + outFormats.extensions[j]
+            fileScore.source = targetFolderDialog.folderPath + "/" + fileName + (transpose.checked ? "-transposed"+ transposeAmount.value : "") + "." + outFormats.extensions[j]
           else
-            fileScore.source = filePath + fileName + "." + outFormats.extensions[j]
+            fileScore.source = filePath + fileName + (transpose.checked ? "-transposed"+ transposeAmount.value : "") + "." + outFormats.extensions[j]
 
           // get modification time of destination file (if it exists)
           // modifiedTime() will return 0 for non-existing files
           // if src is newer than existing write this file
           if (srcModifiedTime > fileScore.modifiedTime()) {
+             readScore(fileScore.source, true)
+             startCmd()
+             cmd("select-all")
+             if (transpose.checked) {
+               if (transposeAmount.value < 0) {
+                 for (var i = transposeAmount.value; i < 0; i++)
+                   cmd("transpose-down");
+                 }
+               else { // transposeAmount.value > 0
+                 for (var i = transposeAmount.value; i > 0; i--) {
+                   cmd("transpose-up");
+                   }
+                 }
+               }
+               endCmd()
+               
              var res = writeScore(thisScore, fileScore.source, outFormats.extensions[j])
              
              if (res)
@@ -741,18 +776,23 @@ MuseScore {
           excerptsList = []
           // do we have excertps?
           var excerpts = thisScore.excerpts
-          for (var ex = 0; ex < excerpts.length; ex++) {
-            if (excerpts[ex].partScore !== thisScore) // only list when not base score
-              excerptsList.push([excerpts[ex], filePath, fileName, srcModifiedTime])
-            }
-          // if we have files start timer
-          if (excerpts.length > 0) {
-            curBaseScore = thisScore // to be able to close this later
-            excerptTimer.running = true
-            return
+          if (excerpts) {
+            for (var ex = 0; ex < excerpts.length; ex++) {
+              if (excerpts[ex].partScore !== thisScore) // only list when not base score
+                excerptsList.push([excerpts[ex], filePath, fileName, srcModifiedTime])
+              }
+            // if we have files start timer
+            if (excerpts.length > 0) {
+              curBaseScore = thisScore // to be able to close this later
+              excerptTimer.running = true
+              return
+              }
             }
           }
-        closeScore(thisScore)
+
+        if (transpose.checked) 
+          cmd("undo") // needs to be done in order to prevent musescore to ask for confirmation to close. (there is no noninteractive argument to closeScore, as there is to readScore)
+        closeScore(thisScore) // close base score
         }
       else
         resultText.append(qsTr("ERROR reading file %1").arg(fileName))
