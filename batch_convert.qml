@@ -483,6 +483,8 @@ MuseScore {
     id: targetFolderDialog
     title: qsTr("Select Target Folder")
     selectFolder: true
+
+    property string folderPath
     
     folder: shortcuts.documents
     onAccepted: {
@@ -753,7 +755,7 @@ MuseScore {
                    cmd("transpose-down");
                  }
                else { // transposeAmount.value > 0
-                 for (var i = transposeAmount.value; i > 0; i--) {
+                 for (var it = transposeAmount.value; it > 0; it--) {
                    cmd("transpose-up");
                    }
                  }
