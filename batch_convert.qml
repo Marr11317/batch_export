@@ -10,882 +10,966 @@ import MuseScore 3.0
 import FileIO 3.0
 
 MuseScore {
-  menuPath: "Plugins." + qsTr("Batch Convert")
-  version: "3.0"
-  requiresScore: false
-  description: qsTr("This plugin converts mutiple files from various formats"
-    + " into various formats")
-//pluginType: "dialog"
+    menuPath: "Plugins." + qsTr("Batch Convert")
+    version: "3.0"
+    requiresScore: false
+    description: qsTr("This plugin converts mutiple files from various formats"
+                      + " into various formats")
+    //pluginType: "dialog"
 
-  MessageDialog {
-    id: versionError
-    visible: false
-    title: qsTr("Unsupported MuseScore Version")
-    text: qsTr("This plugin needs MuseScore 3")
-    onAccepted: {
-    //window.visible = false
-      Qt.quit()
-      }
+    MessageDialog {
+        id: versionError
+        visible: false
+        title: qsTr("Unsupported MuseScore Version")
+        text: qsTr("This plugin needs MuseScore 3")
+        onAccepted: {
+            //window.visible = false
+            Qt.quit()
+        }
     }
 
-  Settings {
-    id: mscoreUISettings
-    category: "ui/application"
-    property var globalStyle
+    Settings {
+        id: mscoreUISettings
+        category: "ui/application"
+        property var globalStyle
     }
-  
-  Settings {
-    id: mscorePathsSettings
-    category: "application/paths"
-    property var myScores
-    }
-
-  onRun: {
-    // check MuseScore version
-    if (mscoreMajorVersion < 3) { // we should really never get here, but fail at the imports above already
-      window.visible = false
-      versionError.open()
-      }
-    else
-      window.visible = true // needed for unknown reasons
-
-    if (mscoreUISettings.globalStyle == 0 /* MuseScoreStyleType.DARK_FUSION */)
-      window.color = "black"
-    else // MuseScoreStyleType.LIGHT_FUSION
-      window.color = "lightgrey"
+    Settings {
+        id: mscorePathsSettings
+        category: "application/paths"
+        property var myScores
     }
 
-  Window {
-    id: window
-    visible: true
-    title: qsTr("Choose Formats")
-    modality: Qt.ApplicationModal // behave like a dialog
+    onRun: {
+        // check MuseScore version
+        if (mscoreMajorVersion < 3) { // we should really never get here, but fail at the imports above already
+            window.visible = false
+            versionError.open()
+        }
+        else
+            window.visible = true // needed for unknown reasons
 
-    // center on screen
-    width: mainRow.childrenRect.width
-    height: mainRow.childrenRect.height
-    x: Screen.width / 2  - width / 2
-    y: Screen.height / 2 - height / 2
+        if (mscoreUISettings.globalStyle === 0 /* MuseScoreStyleType.DARK_FUSION */)
+            window.color = "black"
+        else // MuseScoreStyleType.LIGHT_FUSION
+            window.color = "lightgrey"
+    }
 
-    // Mutally exclusive in/out formats, doesn't work properly
-    ExclusiveGroup { id: mscz }
-    ExclusiveGroup { id: mscx }
-    ExclusiveGroup { id: xml }
-    ExclusiveGroup { id: mxl }
-    ExclusiveGroup { id: mid }
-    ExclusiveGroup { id: pdf }
+    Window {
+        id: window
+        visible: true
+        title: qsTr("Batch Convert")
 
-    RowLayout {
-      id: mainRow
-      GroupBox {
-        id: inFormats
-        title: " " + qsTr("Input Formats") + " "
-        Layout.alignment: Qt.AlignTop | Qt.AlignLeft
-        //flat: true // no effect?!
-        //checkable: true // no effect?!
-        property var extensions: new Array
-        Column {
-          spacing: 1
-          CheckBox {
-            id: inMscz
-            text: "*.mscz"
-            checked: true
-            //exclusiveGroup: mscz  // doesn't work?!
-            onClicked: {
-              if (checked && outMscz.checked)
-                outMscz.checked = false
-              }
-            }
-          CheckBox {
-            id: inMscx
-            text: "*.mscx"
-            //exclusiveGroup: mscx
-            onClicked: {
-              if (checked && outMscx.checked)
-                outMscx.checked = false
-              }
-            }
-          CheckBox {
-            id: inMsc
-            text: "*.msc"
-            enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0
-            visible: enabled // hide if not enabled
-            }
-          CheckBox {
-            id: inXml
-            text: "*.xml"
-            //exclusiveGroup: xml
-            onClicked: {
-              if (checked && outXml.checked)
-                outXml.checked = !checked
-              }
-            }
-          CheckBox {
-            id: inMusicXml
-            text: "*.musicxml"
-            //exclusiveGroup: musicxml
-            enabled: (mscoreMajorVersion >= 3 || (mscoreMajorVersion == 2 && mscoreMinorVersion > 1)) ? true : false // MuseScore > 2.1
-            visible: enabled // hide if not enabled
-            onClicked: {
-              if (checked && outMusicXml.checked)
-                outMusicXml.checked = !checked
-              }
-            }
-          CheckBox {
-            id: inMxl
-            text: "*.mxl"
-            //exclusiveGroup: mxl
-            onClicked: {
-              if (checked && outMxl.checked)
-                outMxl.checked = false
-              }
-            }
-          CheckBox {
-            id: inMid
-            text: "*.mid"
-            //exclusiveGroup: mid
-            onClicked: {
-              if (checked && outMid.checked)
-                outMid.checked = false
-              }
-            }
-          CheckBox {
-            id: inPdf
-            text: "*.pdf"
-            enabled: false // needs OMR, MuseScore > 2.0?
-            visible: enabled // hide if not enabled
-            //exclusiveGroup: pdf
-            onClicked: {
-              if (checked && outPdf.checked)
-                outPdf.checked = false
-              }
-            }
-          CheckBox {
-            id: inMidi
-            text: "*.midi"
-            }
-          CheckBox {
-            id: inKar
-            text: "*.kar"
-            }
-          CheckBox {
-            id: inCap
-            text: "*.cap"
-            }
-          CheckBox {
-            id: inCapx
-            text: "*.capx"
-            }
-          CheckBox {
-            id: inBww
-            text: "*.bww"
-            }
-          CheckBox {
-            id: inMgu
-            text: "*.mgu"
-            }
-          CheckBox {
-            id: inSgu
-            text: "*.sgu"
-            }
-          CheckBox {
-            id: inOve
-            text: "*.ove"
-            }
-          CheckBox {
-            id: inScw
-            text: "*.scw"
-            }
-          CheckBox {
-            id: inGtp
-            text: "*.gtp"
-            }
-          CheckBox {
-            id: inGp3
-            text: "*.gp3"
-            }
-          CheckBox {
-            id: inGp4
-            text: "*.gp4"
-            }
-          CheckBox {
-            id: inGp5
-            text: "*.gp5"
-            }
-          CheckBox {
-            id: inGpx
-            text: "*.gpx"
-            }
-          } // Column
-        } // inFormats
-      ColumnLayout {
-        Layout.alignment: Qt.AlignTop | Qt.AlignRight
-        RowLayout {
-          Label {
-            text: " ===> "
-            Layout.fillWidth: true // left align (?!)
-            }
-          GroupBox {
-            id: outFormats
-            title: " " + qsTr("Output Formats") + " "
-            property var extensions: new Array
-            Column {
-              spacing: 1
-              CheckBox {
-                id: outMscz
-                text: "*.mscz"
-                //exclusiveGroup: mscz
-                onClicked: {
-                  if (checked && inMscz.checked)
-                    inMscz.checked = false
-                  }
+        // Mutally exclusive in/out formats, doesn't work properly
+        ExclusiveGroup { id: mscz }
+        ExclusiveGroup { id: mscx }
+        ExclusiveGroup { id: xml }
+        ExclusiveGroup { id: mxl }
+        ExclusiveGroup { id: mid }
+        ExclusiveGroup { id: pdf }
+
+        Rectangle {
+            anchors.fill: parent;
+            color: "#333"
+        }
+
+        ColumnLayout {
+            id: mainItem;
+            anchors.top: parent.top;
+            anchors.left: parent.left;
+            anchors.right: parent.right;
+
+            Repeater {
+                id: inFormatsListView;
+                delegate: CheckBox {
+                    id: checkboxDelegate
+                    text: format;
+                    checked: isChecked;
                 }
-              CheckBox {
-                id: outMscx
-                text: "*.mscx"
-                //exclusiveGroup: mscx
-                onClicked: {
-                  if (checked && inMscx.checked)
-                    inMscx.checked = false
-                  }
+                model: ListModel {
+                    id: inputFormatsModel
+                    ListElement { format: "*.mscz";     isChecked: true; }
+                    ListElement { format: "*.mscx";     isChecked: false; }
+                    ListElement { format: "*.xml";      isChecked: false; }
+                    ListElement { format: "*.musicxml"; isChecked: false; }
+                    ListElement { format: "*.mxl";      isChecked: false; }
+                    ListElement { format: "*.mid";      isChecked: false; }
+                    ListElement { format: "*.midi";     isChecked: false; }
+                    ListElement { format: "*.kar";      isChecked: false; }
+                    ListElement { format: "*.cap";      isChecked: false; }
+                    ListElement { format: "*.capx";     isChecked: false; }
+                    ListElement { format: "*.bww";      isChecked: false; }
+                    ListElement { format: "*.mgu";      isChecked: false; }
+                    ListElement { format: "*.sgu";      isChecked: false; }
+                    ListElement { format: "*.ove";      isChecked: false; }
+                    ListElement { format: "*.scw";      isChecked: false; }
+                    ListElement { format: "*.gtp";      isChecked: false; }
+                    ListElement { format: "*.gtp3";     isChecked: false; }
+                    ListElement { format: "*.gtp4";     isChecked: false; }
+                    ListElement { format: "*.gtp5";     isChecked: false; }
+                    ListElement { format: "*.gtpx";     isChecked: false; }
                 }
-              CheckBox {
-                id: outXml
-                text: "*.xml"
-                enabled: (mscoreMajorVersion == 2 && mscoreMinorVersion <= 1) ? true : false // MuseScore <= 2.1
-                //could also export to musicxml and then rename that to xml in versions after 2.1
-                visible: enabled // hide if not enabled
-                //exclusiveGroup: xml
-                onClicked: {
-                  if (checked && inXml.checked)
-                    inXml.checked = false
-                  }
-                }
-              CheckBox {
-                id: outMusicXml
-                text: "*.musicxml"
-                enabled: (mscoreMajorVersion >= 3 || (mscoreMajorVersion == 2 && mscoreMinorVersion > 1)) ? true : false // MuseScore > 2.1
-                //could also export to musicxml and then rename that to xml in versions after 2.1
-                visible: enabled // hide if not enabled
-                //exclusiveGroup: musicxml
-                onClicked: {
-                  if (checked && inMusicXml.checked)
-                    inMusicXml.checked = false
-                  }
-                }
-              CheckBox {
-                id: outMxl
-                text: "*.mxl"
-                //exclusiveGroup: mxl
-                onClicked: {
-                  if (checked && inMxl.checked)
-                    inMxl.checked = false
-                  }
-                }
-              CheckBox {
-                id: outMid
-                text: "*.mid"
-                //exclusiveGroup: mid
-                onClicked: {
-                  if (checked && inMid.checked)
-                    inMid.checked = false
-                  }
-                }
-              CheckBox {
-                id: outPdf
-                text: "*.pdf"
-                checked: true
-                //exclusiveGroup: pdf
-                onClicked: {
-                  if (checked && inPdf.checked)
-                    inPdf.checked = false
-                  }
-                }
-              CheckBox {
-                id: outPs
-                text: "*.ps"
-                enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0
-                visible: enabled // hide if not enabled
-                }
-              CheckBox {
-                id: outPng
-                text: "*.png"
-                }
-              CheckBox {
-                id: outSvg
-                text: "*.svg"
-                }
-              CheckBox {
-                id: outLy
-                text: "*.ly"
-                enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0, or via xml2ly?
-                visible: enabled // hide if not enabled
-                }
-              CheckBox {
-                id: outWav
-                text: "*.wav"
-                }
-              CheckBox {
-                id: outFlac
-                text: "*.flac"
-                }
-              CheckBox {
-                id: outOgg
-                text: "*.ogg"
-                }
-              CheckBox { // needs lame_enc.dll
-                id: outMp3
-                text: "*.mp3"
-                }
-              } //Column
-            } //outFormats
-          } // RowLayout
-        CheckBox {
-          id: exportExcerpts
-          text: /*qsTr("Export linked parts")*/ qsTranslate("action", "Export Parts")
-          enabled: (mscoreMajorVersion == 3 && mscoreMinorVersion > 0 || (mscoreMinorVersion == 0 && mscoreUpdateVersion > 2)) ? true : false // MuseScore > 3.0.2
-          visible: enabled //  hide if not enabled
-          } // exportExcerpts
-        CheckBox {
-          id: traverseSubdirs
-          text: qsTr("Process\nSubdirectories")
-          } // traverseSubdirs
-        CheckBox {
-          id: differentExportPath
-          visible: !traverseSubdirs.checked // only allow different export path if not traversing subdirs
-          text: qsTr("Different Export\nPath")
-          } // differentExportPath
-        Button {
-          id: reset
-          text: /*qsTr("Reset to Defaults")*/ qsTranslate("QPlatformTheme", "Restore Defaults")
-          onClicked: {
-            resetDefaults()
-            } // onClicked
-          } // reset
-        GroupBox {
-          id: cancelOk
-          Layout.alignment: Qt.AlignBottom | Qt.AlignRight
-          Row {
-            Button {
-              id: ok
-              text: /*qsTr("Ok")*/ qsTranslate("QPlatformTheme", "OK")
-              //isDefault: true // needs more work
-              onClicked: {
-                window.visible = false
-                if (collectInOutFormats())
-                  sourceFolderDialog.open()
-                } // onClicked
-              } // ok
-            Button {
-              id: cancel
-              text: /*qsTr("Cancel")*/ qsTranslate("QPlatformTheme", "Cancel")
-              onClicked: {
-                window.visible = false
-                Qt.quit()
-                }
-              } // Cancel
-            } // Row
-          } // cancelOk
-        } // ColumnLayout
-      } // RowLayout
+            }
+            Text {
+                id: arrow
+                text: qsTr("→")
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                font.pointSize: 30;
+                color: "white";
+            }
+            //        GroupBox {
+            //            id: outFormatsColumn;
+
+            //            title: qsTr("Output Formats");
+            //            anchors {
+            //                top: mainItem.top;
+            //                bottom: mainItem.bottom;
+            //                left: arrow.right;
+            //                margins: 3;
+            //            }
+            //            ListView {
+            //                id: outFormatsListView;
+            //                anchors.fill: parent;
+            //                delegate: checkboxDelegate;
+            //                model: ListModel {
+            //                    id: outFormatsModel
+            //                    ListElement { format: "*.mscz";     isChecked: false; }
+            //                    ListElement { format: "*.mscx";     isChecked: false; }
+            //                    ListElement { format: "*.xml";      isChecked: false; }
+            //                    ListElement { format: "*.musicxml"; isChecked: false; }
+            //                    ListElement { format: "*.mxl";      isChecked: false; }
+            //                    ListElement { format: "*.mid";      isChecked: false; }
+            //                    ListElement { format: "*.pdf";      isChecked: true; }
+            //                    ListElement { format: "*.png";      isChecked: false; }
+            //                    ListElement { format: "*.svg";      isChecked: false; }
+            //                    ListElement { format: "*.wav";      isChecked: false; }
+            //                    ListElement { format: "*.flac";     isChecked: false; }
+            //                    ListElement { format: "*.ogg";      isChecked: false; }
+            //                    ListElement { format: "*.mp3";      isChecked: false; }
+            //                }
+            //            }
+            //        }
+            //            CheckBox {
+            //                id: traverseSubdirs
+            //                text: qsTr("Process\nSubdirectories")
+            //            } // traverseSubdirs
+
+        }
+
+        //        RowLayout {
+        //      id: mainRow
+        //      anchors.topMargin: 2;
+        //      anchors.leftMargin: 2;
+
+        //      GroupBox {
+        //        id: inFormats
+        //        title: " " + qsTr("Input Formats") + " "
+        //        Layout.alignment: Qt.AlignTop | Qt.AlignLeft
+        //        //flat: true // no effect?!
+        //        //checkable: true // no effect?!
+        //        property var extensions: new Array
+        //        Column {
+        //          spacing: 1
+        //          CheckBox {
+        //            id: inMscz
+        //            text: "*.mscz"
+        //            checked: true
+        //            //exclusiveGroup: mscz  // doesn't work?!
+        //            onClicked: {
+        //              if (checked && outMscz.checked)
+        //                outMscz.checked = false
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMscx
+        //            text: "*.mscx"
+        //            //exclusiveGroup: mscx
+        //            onClicked: {
+        //              if (checked && outMscx.checked)
+        //                outMscx.checked = false
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMsc
+        //            text: "*.msc"
+        //            enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0
+        //            visible: enabled // hide if not enabled
+        //            }
+        //          CheckBox {
+        //            id: inXml
+        //            text: "*.xml"
+        //            //exclusiveGroup: xml
+        //            onClicked: {
+        //              if (checked && outXml.checked)
+        //                outXml.checked = !checked
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMusicXml
+        //            text: "*.musicxml"
+        //            //exclusiveGroup: musicxml
+        //            enabled: (mscoreMajorVersion >= 3 || (mscoreMajorVersion == 2 && mscoreMinorVersion > 1)) ? true : false // MuseScore > 2.1
+        //            visible: enabled // hide if not enabled
+        //            onClicked: {
+        //              if (checked && outMusicXml.checked)
+        //                outMusicXml.checked = !checked
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMxl
+        //            text: "*.mxl"
+        //            //exclusiveGroup: mxl
+        //            onClicked: {
+        //              if (checked && outMxl.checked)
+        //                outMxl.checked = false
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMid
+        //            text: "*.mid"
+        //            //exclusiveGroup: mid
+        //            onClicked: {
+        //              if (checked && outMid.checked)
+        //                outMid.checked = false
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inPdf
+        //            text: "*.pdf"
+        //            enabled: false // needs OMR, MuseScore > 2.0?
+        //            visible: enabled // hide if not enabled
+        //            //exclusiveGroup: pdf
+        //            onClicked: {
+        //              if (checked && outPdf.checked)
+        //                outPdf.checked = false
+        //              }
+        //            }
+        //          CheckBox {
+        //            id: inMidi
+        //            text: "*.midi"
+        //            }
+        //          CheckBox {
+        //            id: inKar
+        //            text: "*.kar"
+        //            }
+        //          CheckBox {
+        //            id: inCap
+        //            text: "*.cap"
+        //            }
+        //          CheckBox {
+        //            id: inCapx
+        //            text: "*.capx"
+        //            }
+        //          CheckBox {
+        //            id: inBww
+        //            text: "*.bww"
+        //            }
+        //          CheckBox {
+        //            id: inMgu
+        //            text: "*.mgu"
+        //            }
+        //          CheckBox {
+        //            id: inSgu
+        //            text: "*.sgu"
+        //            }
+        //          CheckBox {
+        //            id: inOve
+        //            text: "*.ove"
+        //            }
+        //          CheckBox {
+        //            id: inScw
+        //            text: "*.scw"
+        //            }
+        //          CheckBox {
+        //            id: inGtp
+        //            text: "*.gtp"
+        //            }
+        //          CheckBox {
+        //            id: inGp3
+        //            text: "*.gp3"
+        //            }
+        //          CheckBox {
+        //            id: inGp4
+        //            text: "*.gp4"
+        //            }
+        //          CheckBox {
+        //            id: inGp5
+        //            text: "*.gp5"
+        //            }
+        //          CheckBox {
+        //            id: inGpx
+        //            text: "*.gpx"
+        //            }
+        //          } // Column
+        //        } // inFormats
+        //      ColumnLayout {
+        //        Layout.alignment: Qt.AlignTop | Qt.AlignRight
+        //        RowLayout {
+        //          Label {
+        //            text: " ===> "
+        //            Layout.fillWidth: true // left align (?!)
+        //            }
+        //          GroupBox {
+        //            id: outFormats
+        //            title: " " + qsTr("Output Formats") + " "
+        //            property var extensions: new Array
+        //            Column {
+        //              spacing: 1
+        //              CheckBox {
+        //                id: outMscz
+        //                text: "*.mscz"
+        //                //exclusiveGroup: mscz
+        //                onClicked: {
+        //                  if (checked && inMscz.checked)
+        //                    inMscz.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outMscx
+        //                text: "*.mscx"
+        //                //exclusiveGroup: mscx
+        //                onClicked: {
+        //                  if (checked && inMscx.checked)
+        //                    inMscx.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outXml
+        //                text: "*.xml"
+        //                enabled: (mscoreMajorVersion == 2 && mscoreMinorVersion <= 1) ? true : false // MuseScore <= 2.1
+        //                //could also export to musicxml and then rename that to xml in versions after 2.1
+        //                visible: enabled // hide if not enabled
+        //                //exclusiveGroup: xml
+        //                onClicked: {
+        //                  if (checked && inXml.checked)
+        //                    inXml.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outMusicXml
+        //                text: "*.musicxml"
+        //                enabled: (mscoreMajorVersion >= 3 || (mscoreMajorVersion == 2 && mscoreMinorVersion > 1)) ? true : false // MuseScore > 2.1
+        //                //could also export to musicxml and then rename that to xml in versions after 2.1
+        //                visible: enabled // hide if not enabled
+        //                //exclusiveGroup: musicxml
+        //                onClicked: {
+        //                  if (checked && inMusicXml.checked)
+        //                    inMusicXml.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outMxl
+        //                text: "*.mxl"
+        //                //exclusiveGroup: mxl
+        //                onClicked: {
+        //                  if (checked && inMxl.checked)
+        //                    inMxl.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outMid
+        //                text: "*.mid"
+        //                //exclusiveGroup: mid
+        //                onClicked: {
+        //                  if (checked && inMid.checked)
+        //                    inMid.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outPdf
+        //                text: "*.pdf"
+        //                checked: true
+        //                //exclusiveGroup: pdf
+        //                onClicked: {
+        //                  if (checked && inPdf.checked)
+        //                    inPdf.checked = false
+        //                  }
+        //                }
+        //              CheckBox {
+        //                id: outPs
+        //                text: "*.ps"
+        //                enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0
+        //                visible: enabled // hide if not enabled
+        //                }
+        //              CheckBox {
+        //                id: outPng
+        //                text: "*.png"
+        //                }
+        //              CheckBox {
+        //                id: outSvg
+        //                text: "*.svg"
+        //                }
+        //              CheckBox {
+        //                id: outLy
+        //                text: "*.ly"
+        //                enabled: (mscoreMajorVersion < 2) ? true : false // MuseScore < 2.0, or via xml2ly?
+        //                visible: enabled // hide if not enabled
+        //                }
+        //              CheckBox {
+        //                id: outWav
+        //                text: "*.wav"
+        //                }
+        //              CheckBox {
+        //                id: outFlac
+        //                text: "*.flac"
+        //                }
+        //              CheckBox {
+        //                id: outOgg
+        //                text: "*.ogg"
+        //                }
+        //              CheckBox { // needs lame_enc.dll
+        //                id: outMp3
+        //                text: "*.mp3"
+        //                }
+        //              } //Column
+        //            } //outFormats
+        //          } // RowLayout
+        //        CheckBox {
+        //          id: exportExcerpts
+        //          text: /*qsTr("Export linked parts")*/ qsTranslate("action", "Export Parts")
+        //          enabled: (mscoreMajorVersion == 3 && mscoreMinorVersion > 0 || (mscoreMinorVersion == 0 && mscoreUpdateVersion > 2)) ? true : false // MuseScore > 3.0.2
+        //          visible: enabled //  hide if not enabled
+        //          } // exportExcerpts
+        //        CheckBox {
+        //          id: traverseSubdirs
+        //          text: qsTr("Process\nSubdirectories")
+        //          } // traverseSubdirs
+        //        CheckBox {
+        //          id: differentExportPath
+        //          visible: !traverseSubdirs.checked // only allow different export path if not traversing subdirs
+        //          text: qsTr("Different Export\nPath")
+        //          } // differentExportPath
+        //        Button {
+        //          id: reset
+        //          text: /*qsTr("Reset to Defaults")*/ qsTranslate("QPlatformTheme", "Restore Defaults")
+        //          onClicked: {
+        //            resetDefaults()
+        //            } // onClicked
+        //          } // reset
+        //        GroupBox {
+        //          id: cancelOk
+        //          Layout.alignment: Qt.AlignBottom | Qt.AlignRight
+        //          Row {
+        //            Button {
+        //              id: ok
+        //              text: /*qsTr("Ok")*/ qsTranslate("QPlatformTheme", "OK")
+        //              //isDefault: true // needs more work
+        //              onClicked: {
+        //                window.visible = false
+        //                if (collectInOutFormats())
+        //                  sourceFolderDialog.open()
+        //                } // onClicked
+        //              } // ok
+        //            Button {
+        //              id: cancel
+        //              text: /*qsTr("Cancel")*/ qsTranslate("QPlatformTheme", "Cancel")
+        //              onClicked: {
+        //                window.visible = false
+        //                Qt.quit()
+        //                }
+        //              } // Cancel
+        //            } // Row
+        //          } // cancelOk
+        //        } // ColumnLayout
+        //        } // RowLayout
     } // Window
 
-  // remember settings
-  Settings {
-    id: settings
-    category: "BatchConvertPlugin"
-    // in options
-    property alias inMscz:  inMscz.checked
-    property alias inMscx:  inMscx.checked
-    property alias inMsc:   inMsc.checked
-    property alias inXml:   inXml.checked
-    property alias inMusicXml:   inMusicXml.checked
-    property alias inMxl:   inMxl.checked
-    property alias inMid:   inMid.checked
-    property alias inPdf:   inPdf.checked
-    property alias inMidi:  inMidi.checked
-    property alias inKar:   inKar.checked
-    property alias inCap:   inCap.checked
-    property alias inCapx:  inCapx.checked
-    property alias inBww:   inBww.checked
-    property alias inMgu:   inMgu.checked
-    property alias inSgu:   inSgu.checked
-    property alias inOve:   inOve.checked
-    property alias inScw:   inScw.checked
-    property alias inGtp:   inGtp.checked
-    property alias inGp3:   inGp3.checked
-    property alias inGp4:   inGp4.checked
-    property alias inGp5:   inGp5.checked
-    property alias inGpx:   inGpx.checked
-    // out options
-    property alias outMscz: outMscz.checked
-    property alias outMscx: outMscx.checked
-    property alias outXml:  outXml.checked
-    property alias outMusicXml:  outMusicXml.checked
-    property alias outMxl:  outMxl.checked
-    property alias outMid:  outMid.checked
-    property alias outPdf:  outPdf.checked
-    property alias outPs:   outPs.checked
-    property alias outPng:  outPng.checked
-    property alias outSvg:  outSvg.checked
-    property alias outLy:   outLy.checked
-    property alias outWav:  outWav.checked
-    property alias outFlac: outFlac.checked
-    property alias outOgg:  outOgg.checked
-    property alias outMp3:  outMp3.checked
-    // other options
-    property alias exportE: exportExcerpts.checked
-    property alias travers: traverseSubdirs.checked
-    property alias diffEPath: differentExportPath.checked  // different export path
-    property alias iPath: mscorePathsSettings.myScores // import path
-    property alias ePath: mscorePathsSettings.myScores // export path
-    }
+    // remember settings
+    //  Settings {
+    //    id: settings
+    //    category: "BatchConvertPlugin"
+    //    // in options
+    //    property alias inMscz:  inMscz.checked
+    //    property alias inMscx:  inMscx.checked
+    //    property alias inMsc:   inMsc.checked
+    //    property alias inXml:   inXml.checked
+    //    property alias inMusicXml:   inMusicXml.checked
+    //    property alias inMxl:   inMxl.checked
+    //    property alias inMid:   inMid.checked
+    //    property alias inPdf:   inPdf.checked
+    //    property alias inMidi:  inMidi.checked
+    //    property alias inKar:   inKar.checked
+    //    property alias inCap:   inCap.checked
+    //    property alias inCapx:  inCapx.checked
+    //    property alias inBww:   inBww.checked
+    //    property alias inMgu:   inMgu.checked
+    //    property alias inSgu:   inSgu.checked
+    //    property alias inOve:   inOve.checked
+    //    property alias inScw:   inScw.checked
+    //    property alias inGtp:   inGtp.checked
+    //    property alias inGp3:   inGp3.checked
+    //    property alias inGp4:   inGp4.checked
+    //    property alias inGp5:   inGp5.checked
+    //    property alias inGpx:   inGpx.checked
+    //    // out options
+    //    property alias outMscz: outMscz.checked
+    //    property alias outMscx: outMscx.checked
+    //    property alias outXml:  outXml.checked
+    //    property alias outMusicXml:  outMusicXml.checked
+    //    property alias outMxl:  outMxl.checked
+    //    property alias outMid:  outMid.checked
+    //    property alias outPdf:  outPdf.checked
+    //    property alias outPs:   outPs.checked
+    //    property alias outPng:  outPng.checked
+    //    property alias outSvg:  outSvg.checked
+    //    property alias outLy:   outLy.checked
+    //    property alias outWav:  outWav.checked
+    //    property alias outFlac: outFlac.checked
+    //    property alias outOgg:  outOgg.checked
+    //    property alias outMp3:  outMp3.checked
+    //    // other options
+    //    property alias exportE: exportExcerpts.checked
+    //    property alias travers: traverseSubdirs.checked
+    //    property alias diffEPath: differentExportPath.checked  // different export path
+    //    property alias iPath: mscorePathsSettings.myScores // import path
+    //    property alias ePath: mscorePathsSettings.myScores // export path
+    //    }
 
-  FileDialog {
-    id: sourceFolderDialog
-    title: traverseSubdirs.checked ?
-      qsTr("Select Sources Startfolder"):
-      qsTr("Select Sources Folder")
-    selectFolder: true
-    folder: "file:///" + settings.ipath // transform to URL
+    //    FileDialog {
+    //        id: sourceFolderDialog
+    //        title: traverseSubdirs.checked ?
+    //                   qsTr("Select Sources Startfolder"):
+    //                   qsTr("Select Sources Folder")
+    //        selectFolder: true
+    //        folder: "file:///" + settings.ipath // transform to URL
+
+    //        onAccepted: {
+    //            if (differentExportPath.checked && !traverseSubdirs.checked)
+    //                targetFolderDialog.open(); // work we be called from within the target folder dialog
+    //            else
+    //                work()
+    //        }
+    //        onRejected: {
+    //            console.log("No source folder selected")
+    //            Qt.quit()
+    //        }
+    //        Component.onDestruction: {
+    //            settings.ipath = sourceFolderDialog.folder
+    //        }
+    //    } // sourceFolderDialog
     
-    onAccepted: {
-      if (differentExportPath.checked && !traverseSubdirs.checked)
-        targetFolderDialog.open(); // work we be called from within the target folder dialog
-      else
-        work() 
-      }
-    onRejected: {
-      console.log("No source folder selected")
-      Qt.quit()
-      }
-    Component.onDestruction: {
-      settings.ipath = sourceFolderDialog.folder
-      }
-    } // sourceFolderDialog
+    //    FileDialog {
+    //        id: targetFolderDialog
+    //        title: qsTr("Select Target Folder")
+    //        selectFolder: true
+    //        folder: "file:///" + settings.epath // transform to URL
+
+    //        property string folderPath: ""
+    //        onAccepted: {
+    //            // remove the file:/// at the beginning of the return value of targetFolderDialog.folder
+    //            // However, what needs to be done depends on the platform.
+    //            // See this stackoverflow post for more details:
+    //            // https://stackoverflow.com/questions/24927850/get-the-path-from-a-qml-url
+    //            if (folder.toString().indexOf("file:///") != -1) // startsWith is EcmaScript6, so not for now
+    //                folderPath = folder.toString().substring(folder.toString().charAt(9) === ':' ? 8 : 7)
+    //            else
+    //                folderPath = folder
+    //            work()
+    //        }
+
+    //        onRejected: {
+    //            console.log("No target folder selected")
+    //            Qt.quit()
+    //        }
+    //        Component.onDestruction: {
+    //            settings.epath = targetFolderDialog.folder
+    //        }
+    //    } // targetFolderDialog
+
+    //    function resetDefaults() {
+    //        inMscx.checked = inXml.checked = inMusicXml.checked = inMxl.checked = inMid.checked =
+    //                inPdf.checked = inMidi.checked = inKar.checked = inCap.checked =
+    //                inCapx.checked = inBww.checked = inMgu.checked = inSgu.checked =
+    //                inOve.checked = inScw.checked = inGtp.checked = inGp3.checked =
+    //                inGp4.checked = inGp5.checked = inGpx.checked = false
+    //        outMscz.checked = outMscx.checked = outXml.checked = outMusicXml.checked = outMxl.checked =
+    //                outMid.checked = outPdf.checked = outPs.checked = outPng.checked =
+    //                outSvg.checked = outLy.checked = outWav.checked = outFlac.checked =
+    //                outOgg.checked = outMp3.checked = false
+    //        traverseSubdirs.checked = false
+    //        exportExcerpts.checked = false
+    //        // 'uncheck' everything, then 'check' the next few
+    //        inMscz.checked = outPdf.checked = true
+    //        differentExportPath.checked = false
+    //    } // resetDefaults
+
+    //    function collectInOutFormats() {
+    //        if (inMscz.checked) inFormats.extensions.push("mscz")
+    //        if (inMscx.checked) inFormats.extensions.push("mscx")
+    //        if (inXml.checked)  inFormats.extensions.push("xml")
+    //        if (inMusicXml.checked)  inFormats.extensions.push("musicxml")
+    //        if (inMxl.checked)  inFormats.extensions.push("mxl")
+    //        if (inMid.checked)  inFormats.extensions.push("mid")
+    //        if (inPdf.checked)  inFormats.extensions.push("pdf")
+    //        if (inMidi.checked) inFormats.extensions.push("midi")
+    //        if (inKar.checked)  inFormats.extensions.push("kar")
+    //        if (inCap.checked)  inFormats.extensions.push("cap")
+    //        if (inCapx.checked) inFormats.extensions.push("capx")
+    //        if (inBww.checked)  inFormats.extensions.push("bww")
+    //        if (inMgu.checked)  inFormats.extensions.push("mgu")
+    //        if (inSgu.checked)  inFormats.extensions.push("sgu")
+    //        if (inOve.checked)  inFormats.extensions.push("ove")
+    //        if (inScw.checked)  inFormats.extensions.push("scw")
+    //        if (inGtp.checked)  inFormats.extensions.push("gtp")
+    //        if (inGp3.checked)  inFormats.extensions.push("gp3")
+    //        if (inGp4.checked)  inFormats.extensions.push("gp4")
+    //        if (inGp5.checked)  inFormats.extensions.push("gp5")
+    //        if (inGpx.checked)  inFormats.extensions.push("gpx")
+    //        if (!inFormats.extensions.length)
+    //            console.log("No input format selected")
+
+    //        if (outMscz.checked) outFormats.extensions.push("mscz")
+    //        if (outMscx.checked) outFormats.extensions.push("mscx")
+    //        if (outXml.checked)  outFormats.extensions.push("xml")
+    //        if (outMusicXml.checked)  outFormats.extensions.push("musicxml")
+    //        if (outMxl.checked)  outFormats.extensions.push("mxl")
+    //        if (outMid.checked)  outFormats.extensions.push("mid")
+    //        if (outPdf.checked)  outFormats.extensions.push("pdf")
+    //        if (outPs.checked)   outFormats.extensions.push("ps")
+    //        if (outPng.checked)  outFormats.extensions.push("png")
+    //        if (outSvg.checked)  outFormats.extensions.push("svg")
+    //        if (outLy.checked)   outFormats.extensions.push("ly")
+    //        if (outWav.checked)  outFormats.extensions.push("wav")
+    //        if (outFlac.checked) outFormats.extensions.push("flac")
+    //        if (outOgg.checked)  outFormats.extensions.push("ogg")
+    //        if (outMp3.checked)  outFormats.extensions.push("mp3")
+    //        if (!outFormats.extensions.length)
+    //            console.log("No output format selected")
+
+    //        return (inFormats.extensions.length && outFormats.extensions.length)
+    //    } // collectInOutFormats
+
+    //    // flag for abort request
+    //    property bool abortRequested: false
+
+    //    // dialog to show progress
+    //    Dialog {
+    //        id: workDialog
+    //        modality: Qt.ApplicationModal
+    //        visible: false
+    //        width: 720
+    //        standardButtons: StandardButton.Abort
+
+    //        Label {
+    //            id: currentStatus
+    //            width: 600
+    //            text: qsTr("Running...")
+    //        }
+
+    //        TextArea {
+    //            id: resultText
+    //            width: 700
+    //            height: 250
+    //            anchors {
+    //                top: currentStatus.bottom
+    //                topMargin: 5
+    //            }
+    //        }
+
+    //        onAccepted: {
+    //            Qt.quit()
+    //        }
+
+    //        onRejected: {
+    //            abortRequested = true
+    //            Qt.quit()
+    //        }
+    //    }
+
+    //    function inInputFormats(suffix) {
+    //        var found = false
+
+    //        for (var i = 0; i < inFormats.extensions.length; i++) {
+    //            if (inFormats.extensions[i].toUpperCase() === suffix.toUpperCase()) {
+    //                found = true
+    //                break
+    //            }
+    //        }
+    //        return found
+    //    }
+
+    //    // createDefaultFileName
+    //    // remove some special characters in a score title
+    //    // when creating a file name
+    //    function createDefaultFileName(fn) {
+    //        fn = fn.trim()
+    //        fn = fn.replace(/ /g,"_")
+    //        fn = fn.replace(/\n/g,"_")
+    //        fn = fn.replace(/[\\\/:\*\?\"<>|]/g,"_")
+    //        return fn
+    //    }
+
+    //    // global list of folders to process
+    //    property var folderList
+    //    // global list of files to process
+    //    property var fileList
+    //    // global list of linked parts to process
+    //    property var excerptsList
+
+    //    // variable to remember current parent score for parts
+    //    property var curBaseScore
+
+    //    // FolderListModel can be used to search the file system
+    //    FolderListModel {
+    //        id: files
+    //    }
+
+    //    FileIO {
+    //        id: fileExcerpt
+    //    }
     
-  FileDialog {
-    id: targetFolderDialog
-    title: qsTr("Select Target Folder")
-    selectFolder: true
-    folder: "file:///" + settings.epath // transform to URL
-    
-    property string folderPath: ""
-    onAccepted: {
-      // remove the file:/// at the beginning of the return value of targetFolderDialog.folder
-      // However, what needs to be done depends on the platform.
-      // See this stackoverflow post for more details:
-      // https://stackoverflow.com/questions/24927850/get-the-path-from-a-qml-url
-      if (folder.toString().indexOf("file:///") != -1) // startsWith is EcmaScript6, so not for now
-        folderPath = folder.toString().substring(folder.toString().charAt(9) === ':' ? 8 : 7)
-      else
-        folderPath = folder
-      work()
-    }
+    //    FileIO {
+    //        id: fileScore // We need two because they they are used from 2 different processes,
+    //        // which could cause threading problems
+    //    }
 
-    onRejected: {
-      console.log("No target folder selected")
-      Qt.quit()
-      }
-    Component.onDestruction: {
-      settings.epath = targetFolderDialog.folder
-      }
-    } // targetFolderDialog
+    //    Timer {
+    //        id: excerptTimer
+    //        interval: 1
+    //        running: false
 
-  function resetDefaults() {
-    inMscx.checked = inXml.checked = inMusicXml.checked = inMxl.checked = inMid.checked =
-      inPdf.checked = inMidi.checked = inKar.checked = inCap.checked =
-      inCapx.checked = inBww.checked = inMgu.checked = inSgu.checked =
-      inOve.checked = inScw.checked = inGtp.checked = inGp3.checked =
-      inGp4.checked = inGp5.checked = inGpx.checked = false
-    outMscz.checked = outMscx.checked = outXml.checked = outMusicXml.checked = outMxl.checked =
-      outMid.checked = outPdf.checked = outPs.checked = outPng.checked =
-      outSvg.checked = outLy.checked = outWav.checked = outFlac.checked =
-      outOgg.checked = outMp3.checked = false
-    traverseSubdirs.checked = false
-    exportExcerpts.checked = false
-    // 'uncheck' everything, then 'check' the next few
-    inMscz.checked = outPdf.checked = true
-    differentExportPath.checked = false
-    } // resetDefaults
+    //        // this function processes one linked part and
+    //        // gives control back to Qt to update the dialog
+    //        onTriggered: {
+    //            var curScoreInfo = excerptsList.shift()
+    //            var thisScore = curScoreInfo[0].partScore
+    //            var partTitle = curScoreInfo[0].title
+    //            var filePath = curScoreInfo[1]
+    //            var fileName = curScoreInfo[2]
+    //            var srcModifiedTime = curScoreInfo[3]
 
-  function collectInOutFormats() {
-    if (inMscz.checked) inFormats.extensions.push("mscz")
-    if (inMscx.checked) inFormats.extensions.push("mscx")
-    if (inXml.checked)  inFormats.extensions.push("xml")
-    if (inMusicXml.checked)  inFormats.extensions.push("musicxml")
-    if (inMxl.checked)  inFormats.extensions.push("mxl")
-    if (inMid.checked)  inFormats.extensions.push("mid")
-    if (inPdf.checked)  inFormats.extensions.push("pdf")
-    if (inMidi.checked) inFormats.extensions.push("midi")
-    if (inKar.checked)  inFormats.extensions.push("kar")
-    if (inCap.checked)  inFormats.extensions.push("cap")
-    if (inCapx.checked) inFormats.extensions.push("capx")
-    if (inBww.checked)  inFormats.extensions.push("bww")
-    if (inMgu.checked)  inFormats.extensions.push("mgu")
-    if (inSgu.checked)  inFormats.extensions.push("sgu")
-    if (inOve.checked)  inFormats.extensions.push("ove")
-    if (inScw.checked)  inFormats.extensions.push("scw")
-    if (inGtp.checked)  inFormats.extensions.push("gtp")
-    if (inGp3.checked)  inFormats.extensions.push("gp3")
-    if (inGp4.checked)  inFormats.extensions.push("gp4")
-    if (inGp5.checked)  inFormats.extensions.push("gp5")
-    if (inGpx.checked)  inFormats.extensions.push("gpx")
-    if (!inFormats.extensions.length)
-      console.log("No input format selected")
+    //            // create full file path for part
+    //            var targetBase;
+    //            if (differentExportPath.checked && !traverseSubdirs.checked)
+    //                targetBase = targetFolderDialog.folderPath + "/" + fileName
+    //                        + "-" + createDefaultFileName(partTitle) + "."
+    //            else
+    //                targetBase = filePath + fileName + "-" + createDefaultFileName(partTitle) + "."
 
-    if (outMscz.checked) outFormats.extensions.push("mscz")
-    if (outMscx.checked) outFormats.extensions.push("mscx")
-    if (outXml.checked)  outFormats.extensions.push("xml")
-    if (outMusicXml.checked)  outFormats.extensions.push("musicxml")
-    if (outMxl.checked)  outFormats.extensions.push("mxl")
-    if (outMid.checked)  outFormats.extensions.push("mid")
-    if (outPdf.checked)  outFormats.extensions.push("pdf")
-    if (outPs.checked)   outFormats.extensions.push("ps")
-    if (outPng.checked)  outFormats.extensions.push("png")
-    if (outSvg.checked)  outFormats.extensions.push("svg")
-    if (outLy.checked)   outFormats.extensions.push("ly")
-    if (outWav.checked)  outFormats.extensions.push("wav")
-    if (outFlac.checked) outFormats.extensions.push("flac")
-    if (outOgg.checked)  outFormats.extensions.push("ogg")
-    if (outMp3.checked)  outFormats.extensions.push("mp3")
-    if (!outFormats.extensions.length)
-      console.log("No output format selected")
+    //            // write for all target formats
+    //            for (var j = 0; j < outFormats.extensions.length; j++) {
+    //                // get modification time of destination file (if it exists)
+    //                // modifiedTime() will return 0 for non-existing files
+    //                // if src is newer than existing write this file
+    //                fileExcerpt.source = targetBase + outFormats.extensions[j]
+    //                if (srcModifiedTime > fileExcerpt.modifiedTime()) {
+    //                    var res = writeScore(thisScore, fileExcerpt.source, outFormats.extensions[j])
+    //                    if (res)
+    //                        resultText.append("%1 → %2".arg(fileExcerpt.source).arg(outFormats.extensions[j]))
+    //                    else
+    //                        resultText.append("Error: %1 → %2 not exported".arg(fileExcerpt.source).arg(outFormats.extensions[j]))
+    //                }
+    //                else // file already up to date
+    //                    resultText.append(qsTr("%1 is up to date").arg(fileExcerpt.source))
+    //            }
 
-    return (inFormats.extensions.length && outFormats.extensions.length)
-    } // collectInOutFormats
+    //            // check if more files
+    //            if (!abortRequested && excerptsList.length > 0)
+    //                excerptTimer.running = true
+    //            else {
+    //                // close base score
+    //                closeScore(curBaseScore)
+    //                processTimer.running = true
+    //            }
+    //        }
+    //    }
 
-  // flag for abort request
-  property bool abortRequested: false
+    //    Timer {
+    //        id: processTimer
+    //        interval: 1
+    //        running: false
 
-  // dialog to show progress
-  Dialog {
-    id: workDialog
-    modality: Qt.ApplicationModal
-    visible: false
-    width: 720
-    standardButtons: StandardButton.Abort
+    //        // this function processes one file and then
+    //        // gives control back to Qt to update the dialog
+    //        onTriggered: {
+    //            if (fileList.length === 0) {
+    //                // no more files to process
+    //                workDialog.standardButtons = StandardButton.Ok
+    //                if (!abortRequested)
+    //                    currentStatus.text = /*qsTr("Done.")*/ qsTranslate("QWizzard", "Done") + "."
+    //                else
+    //                    console.log("abort!")
+    //                return
+    //            }
 
-    Label {
-      id: currentStatus
-      width: 600
-      text: qsTr("Running...")
-      }
+    //            var curFileInfo = fileList.shift()
+    //            var filePath = curFileInfo[0]
+    //            var fileName = curFileInfo[1]
+    //            var fileExt = curFileInfo[2]
 
-    TextArea {
-      id: resultText
-      width: 700
-      height: 250
-      anchors {
-        top: currentStatus.bottom
-        topMargin: 5
-        }
-      }
+    //            var fileFullPath = filePath + fileName + "." + fileExt
 
-    onAccepted: {
-      Qt.quit()
-      }
+    //            // read file
+    //            var thisScore = readScore(fileFullPath, true)
 
-    onRejected: {
-      abortRequested = true
-      Qt.quit()
-      }
-    }
+    //            // make sure we have a valid score
+    //            if (thisScore) {
+    //                // get modification time of source file
+    //                fileScore.source = fileFullPath
+    //                var srcModifiedTime = fileScore.modifiedTime()
+    //                // write for all target formats
+    //                for (var j = 0; j < outFormats.extensions.length; j++) {
+    //                    if (differentExportPath.checked && !traverseSubdirs.checked)
+    //                        fileScore.source = targetFolderDialog.folderPath + "/" + fileName + "." + outFormats.extensions[j]
+    //                    else
+    //                        fileScore.source = filePath + fileName + "." + outFormats.extensions[j]
 
-  function inInputFormats(suffix) {
-    var found = false
+    //                    // get modification time of destination file (if it exists)
+    //                    // modifiedTime() will return 0 for non-existing files
+    //                    // if src is newer than existing write this file
+    //                    if (srcModifiedTime > fileScore.modifiedTime()) {
+    //                        var res = writeScore(thisScore, fileScore.source, outFormats.extensions[j])
 
-    for (var i = 0; i < inFormats.extensions.length; i++) {
-      if (inFormats.extensions[i].toUpperCase() === suffix.toUpperCase()) {
-        found = true
-        break
-        }
-      }
-    return found
-    }
+    //                        if (res)
+    //                            resultText.append("%1 → %2".arg(fileFullPath).arg(outFormats.extensions[j]))
+    //                        else
+    //                            resultText.append("Error: %1 → %2 not exported".arg(fileFullPath).arg(outFormats.extensions[j]))
+    //                    }
+    //                    else
+    //                        resultText.append(qsTr("%1 is up to date").arg(fileFullPath))
+    //                }
+    //                // check if we are supposed to export parts
+    //                if (exportExcerpts.checked) {
+    //                    // reset list
+    //                    excerptsList = []
+    //                    // do we have excertps?
+    //                    var excerpts = thisScore.excerpts
+    //                    for (var ex = 0; ex < excerpts.length; ex++) {
+    //                        if (excerpts[ex].partScore !== thisScore) // only list when not base score
+    //                            excerptsList.push([excerpts[ex], filePath, fileName, srcModifiedTime])
+    //                        if (excerpts[ex].partScore !== thisScore) // only list when not base score
+    //                            excerptsList.push([excerpts[ex], fileBase, srcModifiedTime])
+    //                    }
+    //                    // if we have files start timer
+    //                    if (excerpts.length > 0) {
+    //                        curBaseScore = thisScore // to be able to close this later
+    //                        excerptTimer.running = true
+    //                        return
+    //                    }
+    //                }
+    //                closeScore(thisScore)
+    //            }
+    //            else
+    //                resultText.append(qsTr("ERROR reading file %1").arg(fileName))
 
-  // createDefaultFileName
-  // remove some special characters in a score title
-  // when creating a file name
-  function createDefaultFileName(fn) {
-    fn = fn.trim()
-    fn = fn.replace(/ /g,"_")
-    fn = fn.replace(/\n/g,"_")
-    fn = fn.replace(/[\\\/:\*\?\"<>|]/g,"_")
-    return fn
-    }
+    //            // next file
+    //            if (!abortRequested)
+    //                processTimer.running = true
+    //        }
+    //    }
 
-  // global list of folders to process
-  property var folderList
-  // global list of files to process
-  property var fileList
-  // global list of linked parts to process
-  property var excerptsList
+    //    // FolderListModel returns what Qt calles the
+    //    // completeSuffix for "fileSuffix" which means everything
+    //    // that follows the first '.' in a file name. (e.g. 'tar.gz')
+    //    // However, this is not what we want:
+    //    // For us the suffix is the part after the last '.'
+    //    // because some users have dots in their file names.
+    //    // Qt::FileInfo::suffix() would get this, but seems not
+    //    // to be available in FolderListModel.
+    //    // So, we need to do this ourselves:
+    //    function getFileSuffix(fileName) {
 
-  // variable to remember current parent score for parts
-  property var curBaseScore
+    //        var n = fileName.lastIndexOf(".");
+    //        var suffix = fileName.substring(n+1);
 
-  // FolderListModel can be used to search the file system
-  FolderListModel {
-    id: files
-    }
+    //        return suffix
+    //    }
 
-  FileIO {
-    id: fileExcerpt
-    }
-    
-  FileIO {
-    id: fileScore // We need two because they they are used from 2 different processes, 
-                   // which could cause threading problems
-    }
+    //    // This timer contains the function that will be called
+    //    // once the FolderListModel is set.
+    //    Timer {
+    //        id: collectFiles
+    //        interval: 25
+    //        running: false
 
-  Timer {
-    id: excerptTimer
-    interval: 1
-    running: false
+    //        // Add all files found by FolderListModel to our list
+    //        onTriggered: {
+    //            // to be able to show what we're doing
+    //            // we must create a list of files to process
+    //            // and then use a timer to do the work
+    //            // otherwise, the dialog window will not update
 
-    // this function processes one linked part and
-    // gives control back to Qt to update the dialog
-    onTriggered: {
-      var curScoreInfo = excerptsList.shift()
-      var thisScore = curScoreInfo[0].partScore
-      var partTitle = curScoreInfo[0].title
-      var filePath = curScoreInfo[1]
-      var fileName = curScoreInfo[2]
-      var srcModifiedTime = curScoreInfo[3]
+    //            for (var i = 0; i < files.count; i++) {
 
-      // create full file path for part
-      var targetBase;
-      if (differentExportPath.checked && !traverseSubdirs.checked)
-        targetBase = targetFolderDialog.folderPath + "/" + fileName 
-                                    + "-" + createDefaultFileName(partTitle) + "." 
-      else
-        targetBase = filePath + fileName + "-" + createDefaultFileName(partTitle) + "." 
+    //                // if we have a directory, we're supposed to
+    //                // traverse it, so add it to folderList
+    //                if (files.isFolder(i))
+    //                    folderList.push(files.get(i, "fileURL"))
+    //                else if (inInputFormats(getFileSuffix(files.get(i, "fileName")))) {
+    //                    // found a file to process
+    //                    // set file names for in and out files
 
-      // write for all target formats
-      for (var j = 0; j < outFormats.extensions.length; j++) {
-        // get modification time of destination file (if it exists)
-        // modifiedTime() will return 0 for non-existing files
-        // if src is newer than existing write this file
-        fileExcerpt.source = targetBase + outFormats.extensions[j]
-        if (srcModifiedTime > fileExcerpt.modifiedTime()) {
-          var res = writeScore(thisScore, fileExcerpt.source, outFormats.extensions[j])
-          if (res) 
-            resultText.append("%1 → %2".arg(fileExcerpt.source).arg(outFormats.extensions[j]))
-          else
-            resultText.append("Error: %1 → %2 not exported".arg(fileExcerpt.source).arg(outFormats.extensions[j]))
-          }
-        else // file already up to date
-          resultText.append(qsTr("%1 is up to date").arg(fileExcerpt.source))
-        }
+    //                    // We need 3 things:
+    //                    // 1) The file path: C:/Path/To/
+    //                    // 2) The file name:            my_score
+    //                    //                                      .
+    //                    // 3) The file's extension:              mscz
 
-      // check if more files
-      if (!abortRequested && excerptsList.length > 0)
-        excerptTimer.running = true
-      else {
-        // close base score
-        closeScore(curBaseScore)
-        processTimer.running = true
-        }
-      }
-    }
+    //                    var fln = files.get(i, "fileName") // returns  "my_score.mscz"
+    //                    var flp = files.get(i, "filePath") // returns  "C:/Path/To/my_score.mscz"
 
-  Timer {
-    id: processTimer
-    interval: 1
-    running: false
+    //                    var fileExt  = getFileSuffix(fln);  // mscz
+    //                    var fileName = fln.substring(0, fln.length - fileExt.length - 1)
+    //                    var filePath = flp.substring(0, flp.length - fln.length)
 
-    // this function processes one file and then
-    // gives control back to Qt to update the dialog
-    onTriggered: {
-      if (fileList.length === 0) {
-        // no more files to process
-        workDialog.standardButtons = StandardButton.Ok
-        if (!abortRequested)
-          currentStatus.text = /*qsTr("Done.")*/ qsTranslate("QWizzard", "Done") + "."
-        else
-          console.log("abort!")
-        return
-      }
+    //                    /// in doubt uncomment to double check
+    //                    // console.log("fln", fln)
+    //                    // console.log("flp", flp)
+    //                    // console.log("fileExt", fileExt)
+    //                    // console.log("fileName", fileName)
+    //                    // console.log("filePath", filePath)
 
-      var curFileInfo = fileList.shift()
-      var filePath = curFileInfo[0]
-      var fileName = curFileInfo[1]
-      var fileExt = curFileInfo[2]
-      
-      var fileFullPath = filePath + fileName + "." + fileExt
+    //                    fileList.push([filePath, fileName, fileExt])
+    //                }
+    //            }
 
-      // read file
-      var thisScore = readScore(fileFullPath, true)
+    //            // if folderList is non-empty we need to redo this for the next folder
+    //            if (folderList.length > 0) {
+    //                files.folder = folderList.shift()
+    //                // restart timer for folder search
+    //                collectFiles.running = true
+    //            } else if (fileList.length > 0) {
+    //                // if we found files, start timer do process them
+    //                processTimer.running = true
+    //            }
+    //            else {
+    //                // we didn't find any files
+    //                // report this
+    //                resultText.append(qsTr("No files found"))
+    //                workDialog.standardButtons = StandardButton.Ok
+    //                currentStatus.text = /*qsTr("Done.")*/ qsTranslate("QWizzard", "Done") + "."
+    //            }
+    //        }
+    //    }
 
-      // make sure we have a valid score
-      if (thisScore) {
-        // get modification time of source file
-        fileScore.source = fileFullPath
-        var srcModifiedTime = fileScore.modifiedTime()
-        // write for all target formats
-        for (var j = 0; j < outFormats.extensions.length; j++) {
-          if (differentExportPath.checked && !traverseSubdirs.checked)
-            fileScore.source = targetFolderDialog.folderPath + "/" + fileName + "." + outFormats.extensions[j]
-          else
-            fileScore.source = filePath + fileName + "." + outFormats.extensions[j]
+    //    function work() {
+    //        console.log((traverseSubdirs.checked? "Sources Startfolder: ":"Sources Folder: ")
+    //                    + sourceFolderDialog.folder)
 
-          // get modification time of destination file (if it exists)
-          // modifiedTime() will return 0 for non-existing files
-          // if src is newer than existing write this file
-          if (srcModifiedTime > fileScore.modifiedTime()) {
-             var res = writeScore(thisScore, fileScore.source, outFormats.extensions[j])
-             
-             if (res)
-               resultText.append("%1 → %2".arg(fileFullPath).arg(outFormats.extensions[j]))
-             else
-               resultText.append("Error: %1 → %2 not exported".arg(fileFullPath).arg(outFormats.extensions[j]))
-            } 
-          else
-             resultText.append(qsTr("%1 is up to date").arg(fileFullPath))
-          }
-        // check if we are supposed to export parts
-        if (exportExcerpts.checked) {
-          // reset list
-          excerptsList = []
-          // do we have excertps?
-          var excerpts = thisScore.excerpts
-          for (var ex = 0; ex < excerpts.length; ex++) {
-            if (excerpts[ex].partScore !== thisScore) // only list when not base score
-              excerptsList.push([excerpts[ex], filePath, fileName, srcModifiedTime])
-            if (excerpts[ex].partScore !== thisScore) // only list when not base score
-              excerptsList.push([excerpts[ex], fileBase, srcModifiedTime])
-            }
-          // if we have files start timer
-          if (excerpts.length > 0) {
-            curBaseScore = thisScore // to be able to close this later
-            excerptTimer.running = true
-            return
-            }
-          }
-        closeScore(thisScore)
-        }
-      else
-        resultText.append(qsTr("ERROR reading file %1").arg(fileName))
-      
-      // next file
-      if (!abortRequested)
-        processTimer.running = true
-      }
-    }
+    //        if (differentExportPath.checked && !traverseSubdirs.checked)
+    //            console.log("Export folder: " + targetFolderDialog.folderPath)
 
-  // FolderListModel returns what Qt calles the
-  // completeSuffix for "fileSuffix" which means everything
-  // that follows the first '.' in a file name. (e.g. 'tar.gz')
-  // However, this is not what we want:
-  // For us the suffix is the part after the last '.'
-  // because some users have dots in their file names.
-  // Qt::FileInfo::suffix() would get this, but seems not
-  // to be available in FolderListModel.
-  // So, we need to do this ourselves:
-  function getFileSuffix(fileName) {
+    //        // initialize global variables
+    //        fileList = []
+    //        folderList = []
 
-    var n = fileName.lastIndexOf(".");
-    var suffix = fileName.substring(n+1);
+    //        // set folder and filter in FolderListModel
+    //        files.folder = sourceFolderDialog.folder
 
-    return suffix
-    }
+    //        if (traverseSubdirs.checked) {
+    //            files.showDirs = true
+    //            files.showFiles = true
+    //        }
+    //        else {
+    //            // only look for files
+    //            files.showFiles = true
+    //            files.showDirs = false
+    //        }
 
-  // This timer contains the function that will be called
-  // once the FolderListModel is set.
-  Timer {
-    id: collectFiles
-    interval: 25
-    running: false
-
-    // Add all files found by FolderListModel to our list
-    onTriggered: {
-      // to be able to show what we're doing
-      // we must create a list of files to process
-      // and then use a timer to do the work
-      // otherwise, the dialog window will not update
-
-      for (var i = 0; i < files.count; i++) {
-
-        // if we have a directory, we're supposed to
-        // traverse it, so add it to folderList
-        if (files.isFolder(i))
-          folderList.push(files.get(i, "fileURL"))
-        else if (inInputFormats(getFileSuffix(files.get(i, "fileName")))) {
-          // found a file to process
-          // set file names for in and out files
-          
-          // We need 3 things:
-          // 1) The file path: C:/Path/To/
-          // 2) The file name:            my_score
-          //                                      .
-          // 3) The file's extension:              mscz
-          
-          var fln = files.get(i, "fileName") // returns  "my_score.mscz"
-          var flp = files.get(i, "filePath") // returns  "C:/Path/To/my_score.mscz"
-          
-          var fileExt  = getFileSuffix(fln);  // mscz
-          var fileName = fln.substring(0, fln.length - fileExt.length - 1)
-          var filePath = flp.substring(0, flp.length - fln.length)
-          
-          /// in doubt uncomment to double check
-          // console.log("fln", fln)
-          // console.log("flp", flp)
-          // console.log("fileExt", fileExt)
-          // console.log("fileName", fileName)
-          // console.log("filePath", filePath)
-          
-          fileList.push([filePath, fileName, fileExt])
-          }
-        }
-
-      // if folderList is non-empty we need to redo this for the next folder
-      if (folderList.length > 0) {
-        files.folder = folderList.shift()
-        // restart timer for folder search
-        collectFiles.running = true
-      } else if (fileList.length > 0) {
-        // if we found files, start timer do process them
-        processTimer.running = true
-      } 
-      else {
-        // we didn't find any files
-        // report this
-        resultText.append(qsTr("No files found"))
-        workDialog.standardButtons = StandardButton.Ok
-        currentStatus.text = /*qsTr("Done.")*/ qsTranslate("QWizzard", "Done") + "."
-        }
-      }
-    }
-
-  function work() {
-    console.log((traverseSubdirs.checked? "Sources Startfolder: ":"Sources Folder: ")
-      + sourceFolderDialog.folder)
-      
-    if (differentExportPath.checked && !traverseSubdirs.checked)
-      console.log("Export folder: " + targetFolderDialog.folderPath)
-
-    // initialize global variables
-    fileList = []
-    folderList = []
-
-    // set folder and filter in FolderListModel
-    files.folder = sourceFolderDialog.folder
-
-    if (traverseSubdirs.checked) {
-      files.showDirs = true
-      files.showFiles = true
-    } 
-    else {
-      // only look for files
-      files.showFiles = true
-      files.showDirs = false
-      }
-
-    // wait for FolderListModel to update
-    // therefore we start a timer that will
-    // wait for 25 millis and then start working
-    collectFiles.running = true
-    workDialog.visible = true
-    } // work
-  } // MuseScore
+    //        // wait for FolderListModel to update
+    //        // therefore we start a timer that will
+    //        // wait for 25 millis and then start working
+    //        collectFiles.running = true
+    //        workDialog.visible = true
+    //    } // work
+} // MuseScore
